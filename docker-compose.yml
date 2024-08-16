@@ -1,0 +1,11 @@
+services:
+  scraper:
+    build: .
+    restart: unless-stopped
+    container_name: alexa2ha
+    env_file:
+      - .env
+    volumes:
+      - .:/usr/src/app
+      - /srv/home-assistant/config/.storage/alexa_media.XXXX.com.pickle:/cookie.pickle:ro
+    command: python ./main.py
