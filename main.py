@@ -2,10 +2,13 @@ import requests
 import pickle
 from dotenv import load_dotenv
 from http.cookies import SimpleCookie
+from http import cookies
 from collections import defaultdict
 import os
 import logging
 import time
+import sys
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -30,6 +33,15 @@ DEFAULT_HEADERS = {
     "Upgrade-Insecure-Requests": "1"
 }
 
+logger.debug("sys.version_info: %s", sys.version_info[:2])
+if sys.version_info[:2] < (3, 13):
+    # See: https://github.com/python/cpython/issues/112713
+    # 24-09-09 This patch may need to revisited as Python/Home Assistant evolve
+    cookies.Morsel._reserved["partitioned"] = "Partitioned"  # type: ignore[attr-defined]
+    cookies.Morsel._flags.add("partitioned")  # type: ignore[attr-defined]
+    logger.debug("cookies.Morsel was patched")
+else:
+    logger.debug("cookies.Morsel was not patched")
 
 def add_item_to_shopping_list(webhook_url, item_name):
     try:

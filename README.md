@@ -84,3 +84,14 @@ docker-compose up --build
 2024-08-16 15:28:44 - __main__ - INFO - Item marked as completed: banane
 ```
 
+
+## Run locally (for development)
+
+```bash
+pip3 install -r requirements.txt
+export HA_WEBHOOK_URL=http://192.168.1.254:8123/api/webhook/--8v4O3JZHbRRPMS93nspLfIS
+export AMAZON_URL=https://www.amazon.fr
+export COOKIE_PATH=/cookie.pickle
+export LOG_LEVEL=INFO
+python3 main.py
+```
