@@ -158,7 +158,7 @@ def main():
         # Retrieve items from list
         response = make_authenticated_request(list_items_url, cookie_file_path)
         if response and response.status_code == 200:
-            logger.info("Successfully retrieved data.")
+            logger.debug("Successfully retrieved data.")
             response_data = response.json()
 
             # Extract list items
