@@ -63,7 +63,7 @@ integration.
 ```yaml
 services:
   scraper:
-    build: .
+    image: ghcr.io/roondar/alexa2ha:main
     restart: unless-stopped
     container_name: alexa2ha
     env_file:
@@ -74,10 +74,10 @@ services:
     command: python ./main.py
 ```
 
-### 4. Build and Run
+### 4. Run
 
 ```bash
-docker-compose up --build
+docker-compose up
 2024-08-16 15:28:44 - __main__ - INFO - Successfully retrieved data.
 2024-08-16 15:28:44 - __main__ - INFO - Successfully added item: banane
 2024-08-16 15:28:44 - __main__ - INFO - Marking item as completed: banane
