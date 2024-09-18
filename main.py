@@ -186,4 +186,4 @@ def main():
 if __name__ == "__main__":
     while True:
         main()
-        time.sleep(60)  # Wait for 60 seconds before running again
+        time.sleep(10)  # Wait for 10 seconds before running again
