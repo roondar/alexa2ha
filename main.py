@@ -9,7 +9,6 @@ import logging
 import time
 import sys
 
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -35,8 +34,6 @@ DEFAULT_HEADERS = {
 
 logger.debug("sys.version_info: %s", sys.version_info[:2])
 if sys.version_info[:2] < (3, 13):
-    # See: https://github.com/python/cpython/issues/112713
-    # 24-09-09 This patch may need to revisited as Python/Home Assistant evolve
     cookies.Morsel._reserved["partitioned"] = "Partitioned"  # type: ignore[attr-defined]
     cookies.Morsel._flags.add("partitioned")  # type: ignore[attr-defined]
     logger.debug("cookies.Morsel was patched")
@@ -57,7 +54,6 @@ def add_item_to_shopping_list(webhook_url, item_name):
         logger.error(f'Error adding item: {item_name} - {err}')
         return False
     return True
-
 
 def initialize_environment_variables():
     webhook_url = os.getenv('HA_WEBHOOK_URL')
@@ -80,14 +76,12 @@ def initialize_environment_variables():
         'amazon_api_url': amazon_api_url
     }
 
-
 def load_cookies_from_file(cookie_file_path):
     try:
         with open(cookie_file_path, 'rb') as cookie_file:
             cookies = pickle.load(cookie_file)
         if isinstance(cookies, defaultdict) and all(
                 isinstance(v, SimpleCookie) for v in cookies.values()):
-            # Convert defaultdict of SimpleCookie to a simple dictionary
             cookie_dict = {}
             for domain, simple_cookie in cookies.items():
                 for key, morsel in simple_cookie.items():
@@ -98,43 +92,38 @@ def load_cookies_from_file(cookie_file_path):
         logger.error(f"Failed to load cookies from {cookie_file_path}: {err}")
         return None
 
-
 def make_authenticated_request(url, cookie_file_path, method='GET', payload=None):
-    # Create a session
-    session = requests.Session()
-    session.headers.update(DEFAULT_HEADERS)
-
-    # Load cookies from file and update session cookies
-    cookies = load_cookies_from_file(cookie_file_path)
-    if not cookies:
-        raise ValueError("No cookies loaded")
-    session.cookies.update(cookies)
-
-    # Make the HTTP request
     try:
+        session = requests.Session()
+        session.headers.update(DEFAULT_HEADERS)
+        cookies = load_cookies_from_file(cookie_file_path)
+        if not cookies:
+            logger.error("No cookies loaded")
+            return None
+        session.cookies.update(cookies)
+
         if method == 'GET':
             response = session.get(url)
         elif method == 'PUT':
             response = session.put(url, json=payload)
+        else:
+            raise ValueError(f"Invalid method {method}")
+
         response.raise_for_status()
-    except requests.RequestException as err:
+        return response
+
+    except requests.exceptions.RequestException as err:
         logger.error(f"HTTP request failed: {err}")
         return None
-    return response
-
 
 def extract_list_items(response_data):
-    # Extract the random key and access the desired content
     for key in response_data.keys():
         if isinstance(response_data[key], dict) and 'listItems' in response_data[key]:
             return response_data[key]['listItems']
     return None
 
-
 def filter_incomplete_items(list_items):
-    # Filter out items where `completed` is False
     return [list_item for list_item in list_items if not list_item.get('completed', False)]
-
 
 def mark_item_as_completed(amazon_api_url, cookie_file_path, list_item):
     url = f"{amazon_api_url}/alexashoppinglists/api/updatelistitem"
@@ -147,7 +136,6 @@ def mark_item_as_completed(amazon_api_url, cookie_file_path, list_item):
 
 def main():
     try:
-        # Initialize environment variables
         env_vars = initialize_environment_variables()
         webhook_url = env_vars.get('webhook_url')
         cookie_file_path = env_vars.get('cookie_path')
@@ -155,16 +143,13 @@ def main():
 
         list_items_url = f"{amazon_api_url}/alexashoppinglists/api/getlistitems"
 
-        # Retrieve items from list
         response = make_authenticated_request(list_items_url, cookie_file_path)
-        if response and response.status_code == 200:
+        if response:
             logger.debug("Successfully retrieved data.")
             response_data = response.json()
 
-            # Extract list items
             list_items = extract_list_items(response_data)
             if list_items:
-                # Filter incomplete items
                 incomplete_items = filter_incomplete_items(list_items)
 
                 for incomplete_item in incomplete_items:
@@ -175,15 +160,18 @@ def main():
             else:
                 logger.error("Unable to find 'listItems' in the response.")
         else:
-            logger.error(f"Failed to retrieve data, status code: {response.status_code}")
-            if response:
-                logger.error(response.text)
+            logger.error(f"Failed to retrieve data.")
     except EnvironmentError as env_err:
         logger.critical(env_err)
     except Exception as exc:
         logger.exception("Unhandled exception occurred")
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description='Handle the interval for running the main functionality')
+    parser.add_argument('--interval', type=int, default=10, help='Interval in seconds between operations')
+    args = parser.parse_args()
+
     while True:
         main()
-        time.sleep(10)  # Wait for 10 seconds before running again
+        time.sleep(args.interval)
