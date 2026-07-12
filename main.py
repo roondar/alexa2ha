@@ -1,5 +1,6 @@
 import requests
 import pickle
+import json
 from dotenv import load_dotenv
 from http.cookies import SimpleCookie
 from http import cookies
@@ -79,15 +80,45 @@ def initialize_environment_variables():
 def load_cookies_from_file(cookie_file_path):
     try:
         with open(cookie_file_path, 'rb') as cookie_file:
-            cookies = pickle.load(cookie_file)
-        if isinstance(cookies, defaultdict) and all(
-                isinstance(v, SimpleCookie) for v in cookies.values()):
+            raw_cookie_file = cookie_file.read()
+
+        loaded_cookies = None
+        try:
+            loaded_cookies = json.loads(raw_cookie_file.decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            loaded_cookies = pickle.loads(raw_cookie_file)
+
+        if (
+            isinstance(loaded_cookies, dict)
+            and loaded_cookies.get('format') == 'alexapy.cookies'
+        ):
             cookie_dict = {}
-            for domain, simple_cookie in cookies.items():
+            for cookie in loaded_cookies.get('cookies', []):
+                if not isinstance(cookie, dict):
+                    continue
+                name = cookie.get('name')
+                value = cookie.get('value')
+                if name and value is not None:
+                    cookie_dict[str(name)] = str(value)
+            return cookie_dict
+
+        if isinstance(loaded_cookies, defaultdict) and all(
+                isinstance(v, SimpleCookie) for v in loaded_cookies.values()):
+            cookie_dict = {}
+            for domain, simple_cookie in loaded_cookies.items():
                 for key, morsel in simple_cookie.items():
                     cookie_dict[key] = morsel.value
             return cookie_dict
-        return cookies
+
+        if isinstance(loaded_cookies, dict):
+            return loaded_cookies
+
+        logger.error(
+            "Unsupported cookie format in %s: %s",
+            cookie_file_path,
+            type(loaded_cookies).__name__,
+        )
+        return None
     except Exception as err:
         logger.error(f"Failed to load cookies from {cookie_file_path}: {err}")
         return None
