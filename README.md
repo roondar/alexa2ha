@@ -51,7 +51,7 @@ Ensure you have a `.env` file in the project root with the following content:
 ```yaml
 HA_WEBHOOK_URL=http://192.168.1.254:8123/api/webhook/--8v4O3JZHbRRPMS93nspLfIS
 AMAZON_URL=https://www.amazon.fr
-COOKIE_PATH=/cookie.pickle
+COOKIE_PATH=/cookie.cookies
 LOG_LEVEL=INFO
 ```
 
@@ -70,9 +70,13 @@ services:
       - .env
     volumes:
       - .:/usr/src/app
-      - /srv/home-assistant/config/.storage/alexa_media.EMAIL.pickle:/cookie.pickle:ro
+      - /srv/home-assistant/config/.storage/alexa_media.EMAIL.cookies:/cookie.cookies:ro
     command: python ./main.py
 ```
+
+Recent `alexa_media_player` releases can generate a JSON `.cookies` file instead of the older
+pickled `.pickle` file. This project should point `COOKIE_PATH` at the `.cookies` file when you
+are using `alexa_media_player` `v5.15.6` or newer.
 
 ### 4. Run
 
@@ -91,7 +95,7 @@ docker-compose up
 pip3 install -r requirements.txt
 export HA_WEBHOOK_URL=http://192.168.1.254:8123/api/webhook/--8v4O3JZHbRRPMS93nspLfIS
 export AMAZON_URL=https://www.amazon.fr
-export COOKIE_PATH=/cookie.pickle
+export COOKIE_PATH=/cookie.cookies
 export LOG_LEVEL=INFO
 python3 main.py
 ```
