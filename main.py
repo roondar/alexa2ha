@@ -70,6 +70,18 @@ def configure_logging(level: str | None = None) -> None:
     logging.getLogger().setLevel(numeric_level)
 
 
+def _log_fatal_startup_error(error: BaseException) -> None:
+    """Log a startup failure without re-validating the user's configuration."""
+
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        level=logging.CRITICAL,
+    )
+    logging.getLogger().setLevel(logging.CRITICAL)
+    logger.critical("Fatal startup error: %s", error)
+
+
 def _positive_number(name: str, value: str, integer: bool = False) -> int | float:
     try:
         parsed: int | float = int(value) if integer else float(value)
@@ -469,6 +481,5 @@ if __name__ == "__main__":
     try:
         run_forever(arguments.interval)
     except (ConfigurationError, OSError, sqlite3.Error) as err:
-        configure_logging()
-        logger.critical("Fatal startup error: %s", err)
+        _log_fatal_startup_error(err)
         raise SystemExit(1) from err

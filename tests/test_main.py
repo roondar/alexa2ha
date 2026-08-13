@@ -1,4 +1,5 @@
 import json
+import logging
 import signal
 import sqlite3
 from pathlib import Path
@@ -50,6 +51,42 @@ def test_config_validation_defaults_and_missing(tmp_path: Path) -> None:
             "COOKIE_PATH": str(cookies),
             "POLL_INTERVAL_SECONDS": "0",
         })
+
+
+def test_config_rejects_invalid_log_level_urls_and_cookie_paths(tmp_path: Path) -> None:
+    cookies = write_cookies(tmp_path / "cookies.json")
+    base = {
+        "HA_WEBHOOK_URL": "http://ha.local/hook",
+        "AMAZON_URL": "https://amazon.example",
+        "COOKIE_PATH": str(cookies),
+    }
+
+    with pytest.raises(main.ConfigurationError, match="LOG_LEVEL"):
+        main.initialize_environment_variables({**base, "LOG_LEVEL": "NOT_A_LEVEL"})
+    with pytest.raises(main.ConfigurationError, match="HA_WEBHOOK_URL"):
+        main.initialize_environment_variables({**base, "HA_WEBHOOK_URL": "not-a-url"})
+    with pytest.raises(main.ConfigurationError, match="HA_WEBHOOK_URL"):
+        main.initialize_environment_variables({**base, "HA_WEBHOOK_URL": "ftp://ha.local/hook"})
+    with pytest.raises(main.ConfigurationError, match="AMAZON_URL"):
+        main.initialize_environment_variables({**base, "AMAZON_URL": "not-a-url"})
+    with pytest.raises(main.ConfigurationError, match="AMAZON_URL"):
+        main.initialize_environment_variables({**base, "AMAZON_URL": "ftp://amazon.example"})
+    with pytest.raises(main.ConfigurationError, match="COOKIE_PATH"):
+        main.initialize_environment_variables({**base, "COOKIE_PATH": str(tmp_path / "missing.json")})
+    with pytest.raises(main.ConfigurationError, match="COOKIE_PATH"):
+        main.initialize_environment_variables({**base, "COOKIE_PATH": str(tmp_path)})
+
+
+def test_fatal_startup_logging_does_not_revalidate_configuration(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.CRITICAL), pytest.raises(SystemExit, match="1"):
+        try:
+            raise main.ConfigurationError("Invalid LOG_LEVEL: NOT_A_LEVEL")
+        except main.ConfigurationError as error:
+            main._log_fatal_startup_error(error)
+            raise SystemExit(1)
+    assert "Fatal startup error" in caplog.text
 
 
 def test_extract_and_filter_items() -> None:
@@ -182,6 +219,18 @@ def test_webhook_timeout_is_not_retried(tmp_path: Path) -> None:
     assert not main.add_item_to_shopping_list(
         "http://ha.local/hook", "milk", session=TimeoutSession(), timeout=(1, 2)  # type: ignore[arg-type]
     )
+
+
+def test_add_item_ignores_empty_and_whitespace_names() -> None:
+    class NoPostSession:
+        def post(self, url: str, **kwargs: object) -> FakeResponse:
+            raise AssertionError("post should not be called for an empty item")
+
+    session = NoPostSession()
+    for name in ("", "   ", "\t\n"):
+        assert not main.add_item_to_shopping_list(
+            "http://ha.local/hook", name, session=session, timeout=(1, 2)  # type: ignore[arg-type]
+        )
 
 
 def test_run_cycle_handles_invalid_json_empty_and_malformed_lists(tmp_path: Path) -> None:

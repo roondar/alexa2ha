@@ -1,6 +1,6 @@
 import pytest
 
-from scripts.release_tags import calculate_release, metadata_tag_specs
+from scripts.release_tags import _branch_slug, calculate_release, metadata_tag_specs
 
 SHA = "0123456789abcdef" * 4
 
@@ -32,6 +32,30 @@ def test_beta_branch_gets_safe_mobile_and_sha_tags() -> None:
     )
     assert metadata.release_tag is None
     assert "latest" not in metadata_tag_specs(metadata)
+
+
+def test_beta_branch_slug_normalizes_runs_and_truncates() -> None:
+    assert _branch_slug("---Cookie***Rotation---") == "cookie-rotation"
+    long_name = "a" * 100
+    assert _branch_slug(long_name) == "a" * 80
+
+
+def test_beta_branch_slug_rejects_only_invalid_characters() -> None:
+    with pytest.raises(ValueError, match="Docker-safe"):
+        _branch_slug("***")
+
+
+def test_sha_validation_boundaries() -> None:
+    with pytest.raises(ValueError):
+        calculate_release("refs/heads/beta/test", "a" * 6)
+    with pytest.raises(ValueError):
+        calculate_release("refs/heads/beta/test", "a" * 65)
+
+    lowercase = calculate_release("refs/heads/beta/test", "abc1234")
+    assert lowercase.tags[1] == "beta-test-sha-abc1234"
+
+    uppercase = calculate_release("refs/heads/beta/test", "A" * 64)
+    assert uppercase.tags[1] == "beta-test-sha-aaaaaaaaaaaa"
 
 
 @pytest.mark.parametrize(
