@@ -1,11 +1,19 @@
 services:
   scraper:
     build: .
+    image: alexa2ha:local
     restart: unless-stopped
     container_name: alexa2ha
     env_file:
       - .env
+    environment:
+      COOKIE_PATH: /cookie.cookies
+      STATE_PATH: /data/state.sqlite3
+      HEARTBEAT_PATH: /tmp/alexa2ha-heartbeat
     volumes:
-      - .:/usr/src/app
-      - /srv/home-assistant/config/.storage/alexa_media.XXXX.com.pickle:/cookie.pickle:ro
-    command: python ./main.py
+      - alexa2ha-state:/data
+      # Set ALEXA_COOKIES_PATH in the host environment or replace this path.
+      - ${ALEXA_COOKIES_PATH:-/srv/home-assistant/config/.storage/alexa_media.cookies}:/cookie.cookies:ro
+
+volumes:
+  alexa2ha-state:
