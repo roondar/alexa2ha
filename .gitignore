@@ -1,0 +1,9 @@
+.env
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.serena/
