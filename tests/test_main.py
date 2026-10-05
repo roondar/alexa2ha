@@ -89,15 +89,51 @@ def test_fatal_startup_logging_does_not_revalidate_configuration(
     assert "Fatal startup error" in caplog.text
 
 
-def test_extract_and_filter_items() -> None:
-    response = {"shoppingList": {"listItems": [
-        {"id": "1", "value": "milk", "completed": False},
-        {"id": "2", "value": "bread", "completed": True},
-    ]}}
+def test_extract_and_filter_items_selects_shopping_list() -> None:
+    response = {
+        "todoList": {
+            "listInfo": {"listType": "TO_DO"},
+            "listItems": [],
+        },
+        "shoppingList": {
+            "listInfo": {"listType": "SHOPPING_LIST"},
+            "listItems": [
+                {"id": "1", "value": "milk", "completed": False},
+                {"id": "2", "value": "bread", "completed": True},
+            ],
+        },
+    }
     items = main.extract_list_items(response)
     assert items is not None
     assert [item["value"] for item in main.filter_incomplete_items(items)] == ["milk"]
-    assert main.extract_list_items({"shoppingList": {"listItems": "bad"}}) is None
+
+
+def test_extract_list_items_accepts_empty_shopping_list() -> None:
+    response = {
+        "shoppingList": {
+            "listInfo": {"listType": "shopping_list"},
+            "listItems": [],
+        }
+    }
+    assert main.extract_list_items(response) == []
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"other": {"listInfo": {"listType": "TO_DO"}, "listItems": []}},
+        {"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}}},
+        {
+            "shoppingList": {
+                "listInfo": {"listType": "SHOPPING_LIST"},
+                "listItems": "bad",
+            }
+        },
+        {"shoppingList": {"listInfo": "bad", "listItems": []}},
+    ],
+)
+def test_extract_list_items_rejects_missing_or_malformed_shopping_list(response: object) -> None:
+    assert main.extract_list_items(response) is None
 
 
 class FakeResponse:
@@ -147,7 +183,7 @@ def test_state_store_prevents_ha_duplicate_after_amazon_failure(tmp_path: Path, 
         "read_timeout": 1,
         "log_level": "INFO",
     }
-    data = {"shoppingList": {"listItems": [{"id": "abc", "value": "milk"}]}}
+    data = {"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}, "listItems": [{"id": "abc", "value": "milk"}]}}
     session = FakeSession(data)
     session.fail_put = True
     with main.StateStore(str(config["state_path"])) as state:
@@ -171,7 +207,7 @@ def test_webhook_failure_does_not_complete_amazon(tmp_path: Path, monkeypatch: p
         "read_timeout": 1,
     }
     state = main.StateStore(":memory:")
-    session = FakeSession({"shoppingList": {"listItems": [{"id": "a", "value": "milk"}]}})
+    session = FakeSession({"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}, "listItems": [{"id": "a", "value": "milk"}]}})
     monkeypatch.setattr(main, "add_item_to_shopping_list", lambda *args, **kwargs: False)
     assert not main.run_cycle(config, state, session)  # type: ignore[arg-type]
     assert not session.puts
@@ -254,10 +290,10 @@ def test_run_cycle_handles_invalid_json_empty_and_malformed_lists(tmp_path: Path
     state = main.StateStore(":memory:")
     assert not main.run_cycle(config, state, JsonSession(FakeResponse(json_error=True)))  # type: ignore[arg-type]
     assert main.run_cycle(
-        config, state, JsonSession(FakeResponse(data={"shoppingList": {"listItems": []}}))  # type: ignore[arg-type]
+        config, state, JsonSession(FakeResponse(data={"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}, "listItems": []}}))  # type: ignore[arg-type]
     )
     assert not main.run_cycle(
-        config, state, JsonSession(FakeResponse(data={"shoppingList": {"listItems": "bad"}}))  # type: ignore[arg-type]
+        config, state, JsonSession(FakeResponse(data={"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}, "listItems": "bad"}}))  # type: ignore[arg-type]
     )
     state.close()
 

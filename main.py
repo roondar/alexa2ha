@@ -274,14 +274,21 @@ def make_authenticated_request(
 
 
 def extract_list_items(response_data: Any) -> list[dict[str, Any]] | None:
+    """Extract items from Alexa's SHOPPING_LIST entry only."""
     if not isinstance(response_data, dict):
         return None
     for value in response_data.values():
-        if isinstance(value, dict) and "listItems" in value:
-            items = value["listItems"]
-            if isinstance(items, list):
-                return [item for item in items if isinstance(item, dict)]
-            return None
+        if not isinstance(value, dict):
+            continue
+        list_info = value.get("listInfo")
+        if not isinstance(list_info, dict):
+            continue
+        if str(list_info.get("listType", "")).upper() != "SHOPPING_LIST":
+            continue
+        items = value.get("listItems")
+        if isinstance(items, list):
+            return [item for item in items if isinstance(item, dict)]
+        return None
     return None
 
 
