@@ -89,15 +89,51 @@ def test_fatal_startup_logging_does_not_revalidate_configuration(
     assert "Fatal startup error" in caplog.text
 
 
-def test_extract_and_filter_items() -> None:
-    response = {"shoppingList": {"listItems": [
-        {"id": "1", "value": "milk", "completed": False},
-        {"id": "2", "value": "bread", "completed": True},
-    ]}}
+def test_extract_and_filter_items_selects_shopping_list() -> None:
+    response = {
+        "todoList": {
+            "listInfo": {"listType": "TO_DO"},
+            "listItems": [],
+        },
+        "shoppingList": {
+            "listInfo": {"listType": "SHOPPING_LIST"},
+            "listItems": [
+                {"id": "1", "value": "milk", "completed": False},
+                {"id": "2", "value": "bread", "completed": True},
+            ],
+        },
+    }
     items = main.extract_list_items(response)
     assert items is not None
     assert [item["value"] for item in main.filter_incomplete_items(items)] == ["milk"]
-    assert main.extract_list_items({"shoppingList": {"listItems": "bad"}}) is None
+
+
+def test_extract_list_items_accepts_empty_shopping_list() -> None:
+    response = {
+        "shoppingList": {
+            "listInfo": {"listType": "shopping_list"},
+            "listItems": [],
+        }
+    }
+    assert main.extract_list_items(response) == []
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"other": {"listInfo": {"listType": "TO_DO"}, "listItems": []}},
+        {"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}}},
+        {
+            "shoppingList": {
+                "listInfo": {"listType": "SHOPPING_LIST"},
+                "listItems": "bad",
+            }
+        },
+        {"shoppingList": {"listInfo": "bad", "listItems": []}},
+    ],
+)
+def test_extract_list_items_rejects_missing_or_malformed_shopping_list(response: object) -> None:
+    assert main.extract_list_items(response) is None
 
 
 class FakeResponse:
