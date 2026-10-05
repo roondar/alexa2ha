@@ -32,6 +32,12 @@ settings before starting. The default poll interval is 60 seconds. The
 optional `--interval` command-line argument overrides
 `POLL_INTERVAL_SECONDS`.
 
+Alexa's `getlistitems` response may contain more than one list. The service
+selects the entry whose `listInfo.listType` is `SHOPPING_LIST`; it does not
+assume that the first `listItems` entry is the shopping list. A valid empty
+shopping list is treated as a successful empty result. Missing or malformed
+shopping-list data fails closed for that polling cycle.
+
 `STATE_PATH` points to a small SQLite registry. Once Home Assistant confirms an
 item, its Amazon identifier is stored before the Amazon completion call. If
 Amazon is temporarily unavailable, the next cycle retries completion without
@@ -39,6 +45,11 @@ posting a duplicate item to Home Assistant. `HEARTBEAT_PATH` is updated after
 successful cycles and is used by the Docker healthcheck.
 
 ## Docker Compose
+
+For normal deployments, use a stable release image: `latest` tracks the most
+recent stable release, while a version tag such as `1.0.0` pins an exact
+release. The legacy `ghcr.io/roondar/alexa2ha:main` tag is no longer
+published and must not be used for new deployments.
 
 Set the host cookie path and start the service:
 
@@ -50,7 +61,19 @@ docker compose logs -f scraper
 
 Compose stores the SQLite state in a named volume and runs the image as an
 unprivileged user. It does not mount the source tree into the production
-container. The Home Assistant automation can use:
+container. Older deployments that bind-mount the repository (for example
+`.:/usr/src/app`) should remove that mount, otherwise an old local
+`main.py` can override code from a newly pulled image.
+
+To verify which image a running container was created from, run:
+
+```bash
+docker inspect alexa2ha --format '{{.Config.Image}}'
+```
+
+If your container has another name, replace `alexa2ha` accordingly.
+
+The Home Assistant automation can use:
 
 ```yaml
 alias: Alexa shopping list
@@ -97,7 +120,11 @@ Run the checks with `ruff check .`, `mypy main.py`, and `python -m pytest -q`.
 ## Releases and container tags
 
 The GitHub Actions workflow runs checks for pull requests and for pushes to
-`main` and `beta/*`. It publishes to GHCR only for the following refs:
+`main` and `beta/*`. A push to `main` is tested but does **not** publish a
+`:main` container image. Stable deployments should use `latest` or an exact
+stable version tag.
+
+It publishes to GHCR only for the following refs:
 
 - `vX.Y.Z` publishes `X.Y.Z`, `X.Y`, `X`, and `latest`, then creates a stable
   GitHub Release with generated notes.
