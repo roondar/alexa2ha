@@ -183,7 +183,7 @@ def test_state_store_prevents_ha_duplicate_after_amazon_failure(tmp_path: Path, 
         "read_timeout": 1,
         "log_level": "INFO",
     }
-    data = {"shoppingList": {"listItems": [{"id": "abc", "value": "milk"}]}}
+    data = {"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}, "listItems": [{"id": "abc", "value": "milk"}]}}
     session = FakeSession(data)
     session.fail_put = True
     with main.StateStore(str(config["state_path"])) as state:
@@ -207,7 +207,7 @@ def test_webhook_failure_does_not_complete_amazon(tmp_path: Path, monkeypatch: p
         "read_timeout": 1,
     }
     state = main.StateStore(":memory:")
-    session = FakeSession({"shoppingList": {"listItems": [{"id": "a", "value": "milk"}]}})
+    session = FakeSession({"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}, "listItems": [{"id": "a", "value": "milk"}]}})
     monkeypatch.setattr(main, "add_item_to_shopping_list", lambda *args, **kwargs: False)
     assert not main.run_cycle(config, state, session)  # type: ignore[arg-type]
     assert not session.puts
@@ -290,10 +290,10 @@ def test_run_cycle_handles_invalid_json_empty_and_malformed_lists(tmp_path: Path
     state = main.StateStore(":memory:")
     assert not main.run_cycle(config, state, JsonSession(FakeResponse(json_error=True)))  # type: ignore[arg-type]
     assert main.run_cycle(
-        config, state, JsonSession(FakeResponse(data={"shoppingList": {"listItems": []}}))  # type: ignore[arg-type]
+        config, state, JsonSession(FakeResponse(data={"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}, "listItems": []}}))  # type: ignore[arg-type]
     )
     assert not main.run_cycle(
-        config, state, JsonSession(FakeResponse(data={"shoppingList": {"listItems": "bad"}}))  # type: ignore[arg-type]
+        config, state, JsonSession(FakeResponse(data={"shoppingList": {"listInfo": {"listType": "SHOPPING_LIST"}, "listItems": "bad"}}))  # type: ignore[arg-type]
     )
     state.close()
 
